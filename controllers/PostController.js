@@ -2,8 +2,14 @@ import dotenv from 'dotenv'
 import nodemailer from 'nodemailer'
 dotenv.config()
 
+import fs from 'fs'
+import path, { dirname } from 'path'
+import { fileURLToPath } from 'url'
 import PostModel from '../models/Post.js'
 import UserModel from '../models/User.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 export const getLastTags = async (req, res) => {
 	try {
@@ -78,33 +84,41 @@ export const remove = async (req, res) => {
 	try {
 		const postId = req.params.id
 
-		PostModel.findOneAndDelete(
-			{
-				_id: postId,
-			},
-			(err, doc) => {
-				if (err) {
-					console.log(err)
-					return res.status(500).json({
-						message: 'Makaleyi silme başarısız oldu',
-					})
-				}
+		const post = await PostModel.findById(postId) // Находим пост по ID
 
-				if (!doc) {
-					return res.status(404).json({
-						message: 'Makale bulunamadı',
-					})
-				}
+		if (!post) {
+			return res.status(404).json({
+				message: 'Makale bulunamadı',
+			})
+		}
 
-				res.json({
-					success: true,
+		// Предполагаем, что post.images содержит массив путей к файлам
+		if (post.image && post.image.length) {
+			post.image.forEach(imagePath => {
+				const filename = imagePath.replace('/uploads/', '')
+				const fullImagePath = path.join(__dirname, '..', 'uploads', filename)
+
+				fs.unlink(fullImagePath, err => {
+					if (err) {
+						console.error(`Ошибка при удалении изображения ${filename}:`, err)
+						// Не отправляем ответ здесь, так как это может прервать дальнейшую обработку
+					} else {
+						console.log(`Изображение ${filename} было успешно удалено`)
+					}
 				})
-			}
-		)
+			})
+		}
+
+		// Удаление самого поста
+		await PostModel.findByIdAndDelete(postId)
+
+		res.json({
+			success: true,
+		})
 	} catch (err) {
 		console.log(err)
 		res.status(500).json({
-			message: 'Makaleler alınamadı',
+			message: 'Не удалось удалить статью',
 		})
 	}
 }

@@ -1,10 +1,15 @@
+import dotenv from 'dotenv'
 import nodemailer from 'nodemailer'
-
 import AccessoriesModel from '../models/Accessories.js'
 import UserModel from '../models/User.js'
-
-import dotenv from 'dotenv'
 dotenv.config()
+
+import fs from 'fs'
+import path, { dirname } from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 export const getAll = async (req, res) => {
 	try {
@@ -21,6 +26,30 @@ export const getAll = async (req, res) => {
 export const remove = async (req, res) => {
 	try {
 		const accessoriesId = req.params.id
+		const accessories = await AccessoriesModel.findById(accessoriesId) // Находим пост по ID
+
+		if (!accessories) {
+			return res.status(404).json({
+				message: 'Makale bulunamadı',
+			})
+		}
+
+		// Предполагаем, что post.images содержит массив путей к файлам
+		if (accessories.image && accessories.image.length) {
+			accessories.image.forEach(imagePath => {
+				const filename = imagePath.replace('/uploads/', '')
+				const fullImagePath = path.join(__dirname, '..', 'uploads', filename)
+
+				fs.unlink(fullImagePath, err => {
+					if (err) {
+						console.error(`Ошибка при удалении изображения ${filename}:`, err)
+						// Не отправляем ответ здесь, так как это может прервать дальнейшую обработку
+					} else {
+						console.log(`Изображение ${filename} было успешно удалено`)
+					}
+				})
+			})
+		}
 
 		AccessoriesModel.findOneAndDelete(
 			{

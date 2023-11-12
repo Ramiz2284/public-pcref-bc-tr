@@ -3,7 +3,13 @@ import nodemailer from 'nodemailer'
 import LaptopsModel from '../models/Laptops.js'
 dotenv.config()
 
+import fs from 'fs'
+import path, { dirname } from 'path'
+import { fileURLToPath } from 'url'
 import UserModel from '../models/User.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 export const getAll = async (req, res) => {
 	try {
@@ -20,6 +26,30 @@ export const getAll = async (req, res) => {
 export const remove = async (req, res) => {
 	try {
 		const laptopsId = req.params.id
+
+		const laptops = await LaptopsModel.findById(laptopsId) // Находим пост по ID
+
+		if (!laptops) {
+			return res.status(404).json({
+				message: 'Makale bulunamadı',
+			})
+		}
+
+		if (laptops.image && laptops.image.length) {
+			laptops.image.forEach(imagePath => {
+				const filename = imagePath.replace('/uploads/', '')
+				const fullImagePath = path.join(__dirname, '..', 'uploads', filename)
+
+				fs.unlink(fullImagePath, err => {
+					if (err) {
+						console.error(`Ошибка при удалении изображения ${filename}:`, err)
+						// Не отправляем ответ здесь, так как это может прервать дальнейшую обработку
+					} else {
+						console.log(`Изображение ${filename} было успешно удалено`)
+					}
+				})
+			})
+		}
 
 		LaptopsModel.findOneAndDelete(
 			{
